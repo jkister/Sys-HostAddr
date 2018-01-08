@@ -1,9 +1,8 @@
 #!/usr/local/bin/perl
 
 # Sys::HostAddr main.t
-# $Id: test.pl,v 1.0 2010/10/06 10:32:25 jkister Exp $
-# Copyright (c) 2010-2014 Jeremy Kister.
-# Released under Perl's Artistic License.
+# Copyright (c) 2010-2018 Jeremy Kister.
+# Released under the Artistic License 2.0
 
 BEGIN {
     #https://rt.cpan.org/Public/Bug/Display.html?id=82629

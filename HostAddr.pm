@@ -1,7 +1,6 @@
 # Sys::HostAddr.pm
-# $Id: HostAddr.pm,v 0.993 2014/09/06 00:53:19 jkister Exp $
-# Copyright (c) 2010-2014 Jeremy Kister.
-# Released under Perl's Artistic License.
+# Copyright (c) 2010-2018 Jeremy Kister.
+# Released under the Artistic License 2.0
 
 package Sys::HostAddr;
 
@@ -10,7 +9,7 @@ use warnings;
 use IO::Socket::INET;
 use Sys::Hostname;
 
-our ($VERSION) = q$Revision: 0.993 $ =~ /(\d+\.\d+)/;
+our $VERSION = 0.993;
 my $ipv;
 
 
