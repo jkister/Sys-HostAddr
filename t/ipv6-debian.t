@@ -3,7 +3,7 @@
 # Sys::HostAddr ipv6-debian.t
 # Copyright (c) 2010-2014 Jeremy Kister.
 # Copyright (c) 2016-2018 Joelle Maslak
-# Released under Perl's Artistic License.
+# Released under the Artistic License 2.0.
 
 #
 # Validates module on some versions of Debian that have a slightly
