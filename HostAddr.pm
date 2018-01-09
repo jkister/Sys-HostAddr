@@ -107,7 +107,7 @@ sub addresses {
     my $cfg_aref = $self->ifconfig( $getint );
     my @addrs;
     for (@{$cfg_aref}){
-        if(/^\s+${ipv}\s+(?:addr:)?(\S+)\s/){
+        if(/^\s+${ipv}\s+(?:addr:\s?)?([0-9a-f:\.]+)(?:\/\d{1,3})?\s/){
             push @addrs, $1; # unix
         }elsif(/^\s+${ipv}[\s\.]+:\s+([a-f0-9:\.]{3,40})/){
             push @addrs, $1; # win7
@@ -130,7 +130,7 @@ sub ip {
     for my $line (@{$cfg_aref}){
         if($line =~ /^([a-z0-9]+(?::[0-9]+)?):?\s+/ && $^O ne 'MSWin32' && $^O ne 'cygwin'){
             $interface = $1;
-        }elsif($line =~ /^\s+${ipv}\s+(?:addr:)?(\S+)\s/){
+        }elsif($line =~ /^\s+${ipv}\s+(?:addr:\s?)?([0-9a-f:\.]+)(?:\/\d{1,3})?\s/){
             my $addr = $1;
             if($line =~ /netmask\s+(?:0x)?([a-f0-9]{8})\s/){
                 my $hexed = $1;
@@ -140,7 +140,7 @@ sub ip {
                 $netmask = $1;
             }elsif($line =~ /Mask:(\S+)/){
                 $netmask = $1;
-            }elsif($self->{ipv} eq '6' && $line =~ m#(/\d{1,3})$#){
+            }elsif($self->{ipv} eq '6' && $line =~ m#(/\d{1,3})(?:\s+Scope.*)?$#){
                 $netmask = $1;
             }else{
                 die "unknown netmask for $addr on $interface\n";
@@ -171,7 +171,7 @@ sub first_ip {
 
     for (@{$cfg_aref}){
         my $addr;
-        if(/^\s+${ipv}\s+(?:addr:)?(\S+)\s/){
+        if(/^\s+${ipv}\s+(?:addr:\s?)?([0-9a-f:\.]+)(?:\/\d{1,3})?\s/){
             $addr = $1; # unix
         }elsif(/^\s+${ipv}[\s\.]+:\s+([a-f0-9:\.]{3,40})/){
             $addr = $1; # windows 7 win32
