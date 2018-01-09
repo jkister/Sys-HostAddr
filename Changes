@@ -1,5 +1,8 @@
 Revision history for Perl extension Sys::HostAddr.
 
+xxxxx  xxxxx
+        - IPv6 parsing fixes for Debian
+
 0.993  Sat Sep 06 00:53:19 EDT 2014
         - fix public detection
 
