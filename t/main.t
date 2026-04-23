@@ -10,8 +10,9 @@ BEGIN {
 };
 
 use strict;
-use Test::Simple tests => 6;
+use Test::More tests => 9;
 
+use IO::Socket::SSL;
 use Sys::HostAddr;
 
 my $sysaddr = Sys::HostAddr->new( debug => 0 );
@@ -24,7 +25,32 @@ ok( $main_ip =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/, "Main IP Address appears
 my $first_ip = $sysaddr->first_ip();
 ok( $first_ip =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/, "First IP Adddress is: $first_ip" );
 
-# don't test public method, no good way for cpan auto installs
+# public() should return undef gracefully when given a bogus host (no crash)
+my $bad = Sys::HostAddr->new();
+{
+    no warnings 'redefine';
+    local *IO::Socket::SSL::new  = sub { return undef };
+    local $SIG{__WARN__}         = sub {};
+    my $result = $bad->public();
+    ok( !defined($result), "public() returns undef on connection failure" );
+}
+
+# _ipv must be per-instance, not shared across objects
+my $s4 = Sys::HostAddr->new( ipv => 4 );
+my $s6 = Sys::HostAddr->new( ipv => 6 );
+ok( $s4->{_ipv} ne $s6->{_ipv}, "IPv4 and IPv6 instances have distinct _ipv values" );
+
+SKIP: {
+    my $probe = IO::Socket::SSL->new(PeerAddr => 'www.dnsbyweb.com',
+                                     PeerPort => 443,
+                                     Timeout  => 5);
+    skip "www.dnsbyweb.com unreachable", 1 unless $probe;
+    close $probe;
+
+    my $pub = $sysaddr->public();
+    ok( defined($pub) && $pub =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+        "public() returned a valid IPv4 address: " . ($pub // 'undef') );
+}
     
 my $href = $sysaddr->ip();
 my $info = "IP info:\n";

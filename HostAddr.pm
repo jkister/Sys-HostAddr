@@ -7,15 +7,10 @@ package Sys::HostAddr;
 use strict;
 use warnings;
 use IO::Socket::INET;
+use IO::Socket::SSL;
 use Sys::Hostname;
 
 our $VERSION = 0.993;
-my $ipv;
-
-
-$ENV{PATH} = ($^O eq 'MSWin32') ?
-               'C:\Windows\system32;C:\Windows;C:\strawberry\c\bin;C:\strawberry\perl\bin;' . $ENV{PATH} :
-               "/usr/sbin:/sbin:/usr/etc:$ENV{PATH}"; # silly centos not having ifconfig in path of non-root
 
 sub new {
     my $class = shift;
@@ -29,11 +24,11 @@ sub new {
     }
 
     my $self = bless(\%args, $class);
- 
-    $self->{class} = $class;   
+
+    $self->{class} = $class;
     $self->{ipv}   = 4 unless( $self->{ipv} );
 
-    $ipv = $self->_mkipv();
+    $self->{_ipv} = $self->_mkipv();
 
     return($self);
 }
@@ -46,19 +41,22 @@ sub public {
         return;
     }
 
-    my $sock = IO::Socket::INET->new(Proto => 'tcp',
-                                     PeerAddr => 'www.dnsbyweb.com',
-                                     PeerPort => 80, 
-                                     Timeout => 3);       
-     
+    my $sock = IO::Socket::SSL->new(PeerAddr => 'www.dnsbyweb.com',
+                                    PeerPort => 443,
+                                    Timeout  => 3);
+    unless($sock){
+        $self->_warn("public: could not connect to www.dnsbyweb.com: $!");
+        return;
+    }
+
     my $platform = ucfirst($^O);
     my $public;
     eval {
         local $SIG{ALRM} = sub { die "timeout during GET\n" };
         alarm(3);
-        print $sock "GET /mip.mpl HTTP/1.1\r\n",                     
+        print $sock "GET /mip.mpl HTTP/1.1\r\n",
                     "Host: www.dnsbyweb.com\r\n",
-                    "User-Agent: Sys::HostAddr/$VERSION (compatible; ${platform}; Perl $])\r\n",  
+                    "User-Agent: Sys::HostAddr/$VERSION (compatible; ${platform}; Perl $])\r\n",
                     "Accept: text/html; q=0.5, text/plain\r\n",
                     "Connection: close\r\n",
                     "\r\n";
@@ -104,6 +102,7 @@ sub addresses {
     my $self = shift;
     my $getint = shift || $self->{interface};
 
+    my $ipv = $self->{_ipv};
     my $cfg_aref = $self->ifconfig( $getint );
     my @addrs;
     for (@{$cfg_aref}){
@@ -124,6 +123,7 @@ sub ip {
     my $self = shift;
     my $getint = shift || $self->{interface};
 
+    my $ipv = $self->{_ipv};
     my $cfg_aref = $self->ifconfig( $getint );
     my %data;
     my ($interface,$addr,$netmask);
@@ -157,7 +157,7 @@ sub ip {
         }elsif($line =~ /^\s+Subnet Mask[\s\.]+:\s+(\S+)/){
             $netmask = $1;
             #this handles multiple ip addrs on same interface (tested on XP, anyway)
-            push @{$data{$interface}}, { address => $addr, netmask => $netmask };
+            push @{$data{$interface}}, { address => $addr, netmask => $netmask } if defined $addr;
         }
     }
     return \%data;
@@ -167,6 +167,7 @@ sub first_ip {
     my $self = shift;
     my $getint = shift || $self->{interface};
 
+    my $ipv = $self->{_ipv};
     my $cfg_aref = $self->ifconfig( $getint );
 
     for (@{$cfg_aref}){
@@ -228,7 +229,8 @@ sub main_ip {
             my @x = ( gethostbyname($hostname) )[4];
             alarm(0);
     
-            verbose( "multiple ip addrs found for $hostname" ) if(@x > 1);
+            $self->_warn("multiple ip addrs found for $hostname") if(@x > 1);
+            return unless defined $x[0];
             $addr = join( '.', unpack('C4', $x[0]) );
         };
         alarm(0);
@@ -270,6 +272,7 @@ sub main_ip {
 
     if($^O eq 'MSWin32' || $^O eq 'cygwin'){
         if($method eq 'preferred' || $method eq 'auto'){
+            my $ipv = $self->{_ipv};
             my $cfg_aref = $self->ifconfig();
             foreach (@{$cfg_aref}){
                 if(/^\s+${ipv}[\s\.]+:\s+(\S+)\(Preferred\)/){
@@ -294,11 +297,15 @@ sub _mkipv {
 sub _get_stdout {
     my $self = shift;
     my $cmd = shift || die "get_stdout syntax error1\n";
-    my $params = join(' ', @_);
+    my @params = @_;
 
-    $self->_debug( "running cmd: [$cmd] params: [$params]" );
+    $self->_debug( "running cmd: [$cmd] params: [@params]" );
 
-    open(my $fh, "$cmd $params |") || die "cannot fork $cmd: $!\n"; # -| is 5.8+
+    local $ENV{PATH} = ($^O eq 'MSWin32') ?
+        'C:\Windows\system32;C:\Windows;C:\strawberry\c\bin;C:\strawberry\perl\bin;' . $ENV{PATH} :
+        "/usr/sbin:/sbin:/usr/etc:$ENV{PATH}";
+
+    open(my $fh, '-|', $cmd, @params) || die "cannot fork $cmd: $!\n";
     my @data = <$fh>;
     close $fh;
 
@@ -440,7 +447,7 @@ C<interfaces> will return an array reference of all interfaces found.
     foreach my $interface ( keys %{$href} ){
         print "$interface has: ";
         foreach my $aref ( @{$href->{$interface}} ){
-             print " $aref->{addr} $aref->{netmask}\n";
+             print " $aref->{address} $aref->{netmask}\n";
         }
     }
     
